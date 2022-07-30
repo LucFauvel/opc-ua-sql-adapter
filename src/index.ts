@@ -1,5 +1,5 @@
 import { OPCUAClient, DataValue, AttributeIds, TimestampsToReturn, ClientSubscription } from 'node-opcua-client';
-import { DataType, Sensor } from './models/sensor';
+import { Reading } from './models/reading';
 import { Subject } from 'rxjs';
 import { Sequelize, DataTypes } from 'sequelize';
 const endpointUrl = 'opc.tcp://172.20.0.10:4840';
@@ -11,7 +11,10 @@ const analogOneSubject$: Subject<number> = new Subject();
 const analogTwoSubject$: Subject<number> = new Subject();
 const sequelize = new Sequelize('ScalanceLPE9403Demo', 'sa', 'Masterkey!', {
     host: 'localhost',
-    dialect: 'mssql'
+    dialect: 'mssql',
+    define: {
+        timestamps: false
+    }
 });
 
 async function main() {
@@ -27,14 +30,8 @@ async function main() {
             }
         });
 
-        Sensor.init({
-            SensorID: {
-                type: DataTypes.INTEGER,
-            },
-            Name: {
-                type: DataTypes.STRING,
-            },
-            DataType: {
+        Reading.init({
+            SensorId: {
                 type: DataTypes.INTEGER,
             },
             Value: {
@@ -61,9 +58,9 @@ async function main() {
             .on('keepalive', () => console.log('keepalive'))
             .on('terminated', () => console.log('subscription terminated'));
 
-        tempSubject$.subscribe(data => saveNodeData("Température Intérieur", data, DataType.Temperature, 5));
-        analogOneSubject$.subscribe(data => saveNodeData("Analog #1", data, DataType.Analog, 3));
-        analogOneSubject$.subscribe(data => saveNodeData("Analog #1", data, DataType.Analog, 4));
+        tempSubject$.subscribe(data => saveNodeData(5, data));
+        analogOneSubject$.subscribe(data => saveNodeData(3, data));
+        analogOneSubject$.subscribe(data => saveNodeData(4, data));
 
         await monitorNode(subscription, tempNodeId, tempSubject$);
         await monitorNode(subscription, analogOneNodeId, analogOneSubject$);
@@ -90,12 +87,10 @@ async function monitorNode(sub: ClientSubscription, nodeId: string, subject: Sub
     });
 }
 
-async function saveNodeData(name: string, value: number, dataType: DataType, sensorID: number) {
-    await Sensor.create({
-        Name: name,
+async function saveNodeData(sensorId: number, value: number) {
+    await Reading.create({
         Value: value,
-        DataType: dataType,
-        SensorID: sensorID
+        SensorId: sensorId
     });
 }
 
