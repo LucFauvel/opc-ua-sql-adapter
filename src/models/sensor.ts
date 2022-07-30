@@ -1,4 +1,4 @@
-import { Model } from "sequelize/types"
+import { Model } from "sequelize"
 
 export class Sensor extends Model {
     declare SensorID: string;

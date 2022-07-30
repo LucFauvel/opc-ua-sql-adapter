@@ -1,8 +1,7 @@
 import { OPCUAClient, DataValue, AttributeIds, TimestampsToReturn, ClientSubscription } from 'node-opcua-client';
 import { DataType, Sensor } from './models/sensor';
 import { Subject } from 'rxjs';
-import { Sequelize, DataTypes as ModelDataType } from 'sequelize';
-
+import { Sequelize, DataTypes } from 'sequelize';
 const endpointUrl = 'opc.tcp://172.20.0.10:4840';
 const analogOneNodeId = 'ns=4;i=3';
 const analogTwoNodeId = 'ns=4;i=4';
@@ -30,16 +29,16 @@ async function main() {
 
         Sensor.init({
             SensorID: {
-                type: ModelDataType.INTEGER,
+                type: DataTypes.INTEGER,
             },
             Name: {
-                type: ModelDataType.STRING,
+                type: DataTypes.STRING,
             },
             DataType: {
-                type: ModelDataType.INTEGER,
+                type: DataTypes.INTEGER,
             },
             Value: {
-                type: ModelDataType.FLOAT,
+                type: DataTypes.FLOAT,
             }
         }, { sequelize });
 
