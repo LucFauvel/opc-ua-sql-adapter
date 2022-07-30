@@ -13,7 +13,9 @@ const sequelize = new Sequelize('ScalanceLPE9403Demo', 'sa', 'Masterkey!', {
     host: 'localhost',
     dialect: 'mssql',
     define: {
-        timestamps: false
+        timestamps: true,
+        createdAt: 'readAt',
+        updatedAt: false,
     }
 });
 
@@ -38,6 +40,7 @@ async function main() {
                 type: DataTypes.FLOAT,
             }
         }, { sequelize });
+        Reading.removeAttribute('id');
 
         client.on('backoff', () => console.log('retrying connection to opc server'));
 
