@@ -1,7 +1,7 @@
 import { OPCUAClient, DataValue, AttributeIds, TimestampsToReturn, ClientSubscription } from 'node-opcua-client';
 import { DataType, Sensor } from './models/sensor';
 import { Subject } from 'rxjs';
-import { Sequelize, DataTypes as ModelDataType } from 'sequelize/types';
+import { Sequelize, DataTypes as ModelDataType } from 'sequelize';
 
 const endpointUrl = 'opc.tcp://172.20.0.10:4840';
 const analogOneNodeId = 'ns=4;i=3';
