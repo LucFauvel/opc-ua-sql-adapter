@@ -2,17 +2,19 @@ FROM node:16 as base
 
 WORKDIR /usr/src/app
 
-COPY package*.json ./
+COPY package.json ./
+COPY yarn.lock ./
 COPY tsconfig.json ./
 
-RUN npm ci
+RUN yarn install --immutable
 
 COPY src ./src
-RUN npm run build
+RUN yarn run build
 
 FROM node:16 as production
 WORKDIR /usr/src/app
-COPY package*.json ./
-RUN npm ci --omit=dev
+COPY package.json ./
+COPY yarn.lock ./
+RUN yarn install --immutable --production
 COPY --from=base /usr/src/app/dist .
 CMD ["node", "index.js"]

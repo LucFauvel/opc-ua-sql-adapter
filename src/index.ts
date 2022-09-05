@@ -1,28 +1,49 @@
 import { OPCUAClient, DataValue, AttributeIds, TimestampsToReturn, ClientSubscription } from 'node-opcua-client';
-import { Reading } from './models/reading';
-import { Subject } from 'rxjs';
-import { Sequelize, DataTypes } from 'sequelize';
-const endpointUrl = 'opc.tcp://172.20.0.10:4840';
-const analogOneNodeId = 'ns=4;i=3';
-const analogTwoNodeId = 'ns=4;i=4';
-const tempNodeId = 'ns=4;i=5';
-const tempSubject$: Subject<number> = new Subject();
-const analogOneSubject$: Subject<number> = new Subject();
-const analogTwoSubject$: Subject<number> = new Subject();
-const sequelize = new Sequelize('ScalanceLPE9403Demo', 'sa', 'Masterkey!', {
-    host: 'localhost',
-    dialect: 'mssql',
-    define: {
-        timestamps: true,
-        createdAt: 'readAt',
-        updatedAt: false,
-    }
-});
+import * as dotenv from 'dotenv'
+import { io, Socket } from "socket.io-client"
+import { OpcUaDevice } from './device';
+dotenv.config();
 
+let devices: OpcUaDevice[] = []
+let opcUaClients = new Map<string, OPCUAClient>();
+let socket: Socket;
 async function main() {
     try {
-        await sequelize.authenticate();
+        socket = io(process.env.CENTRAL_WS_URI as string, {
+            reconnectionDelayMax: 10000,
+            query: {
+                "apiKey": process.env.CENTRAL_API_KEY
+            }
+        });
 
+        socket.io.on("error", (error) => {
+            console.error(error);
+        });
+
+        socket.on("connect", () => {
+            console.log("Successfully connected to API WebSocket")
+        })
+
+        socket.on("load-configs", (response) => {
+            devices = JSON.parse(response);
+            clearClients().then(() => {
+                loadDevices();
+            });
+        })
+        
+    } catch (err) {
+        console.log('Error: ', err)
+    }
+}
+
+async function clearClients() {
+    for (let [, client] of opcUaClients) {
+        client.disconnect();
+    }
+}
+
+async function loadDevices() {
+    for (let device of devices) {
         const client = OPCUAClient.create({
             endpointMustExist: false,
             connectionStrategy: {
@@ -32,19 +53,9 @@ async function main() {
             }
         });
 
-        Reading.init({
-            SensorId: {
-                type: DataTypes.INTEGER,
-            },
-            Value: {
-                type: DataTypes.FLOAT,
-            }
-        }, { sequelize });
-        Reading.removeAttribute('id');
-
         client.on('backoff', () => console.log('retrying connection to opc server'));
 
-        await client.connect(endpointUrl);
+        await client.connect(device.address);
         const session = await client.createSession();
 
         const subscription = await  session.createSubscription2({
@@ -61,20 +72,15 @@ async function main() {
             .on('keepalive', () => console.log('keepalive'))
             .on('terminated', () => console.log('subscription terminated'));
 
-        tempSubject$.subscribe(data => saveNodeData(5, data));
-        analogOneSubject$.subscribe(data => saveNodeData(3, data));
-        analogOneSubject$.subscribe(data => saveNodeData(4, data));
+        for (let sensor of device.sensors) {
+            monitorNodeChange(subscription, sensor.nodeId, sensor.id)
+        }
 
-        await monitorNode(subscription, tempNodeId, tempSubject$);
-        await monitorNode(subscription, analogOneNodeId, analogOneSubject$);
-        await monitorNode(subscription, analogTwoNodeId, analogTwoSubject$);
-        
-    } catch (err) {
-        console.log('Error: ', err)
+        opcUaClients.set(device.id, client);
     }
 }
 
-async function monitorNode(sub: ClientSubscription, nodeId: string, subject: Subject<number>) {
+async function monitorNodeChange(sub: ClientSubscription, nodeId: string, sensorId: string) {
     const monitoredItem = await sub.monitor({
         nodeId,
         attributeId: AttributeIds.Value
@@ -86,14 +92,7 @@ async function monitorNode(sub: ClientSubscription, nodeId: string, subject: Sub
     TimestampsToReturn.Both);
     
     monitoredItem.on('changed', (dataValue: DataValue) => {
-        subject.next(dataValue.value.value)
-    });
-}
-
-async function saveNodeData(sensorId: number, value: number) {
-    await Reading.create({
-        Value: value,
-        SensorId: sensorId
+        socket.emit('value-read', { sensorId: sensorId, value: dataValue.value.value, readAt: dataValue.sourceTimestamp })
     });
 }
 

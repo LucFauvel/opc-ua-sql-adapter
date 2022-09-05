@@ -1,0 +1,4 @@
+const endpointUrl = 'opc.tcp://172.20.0.10:4840';
+const analogOneNodeId = 'ns=4;i=3';
+const analogTwoNodeId = 'ns=4;i=4';
+const tempNodeId = 'ns=4;i=5';
